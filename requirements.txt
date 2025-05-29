@@ -1,8 +1,22 @@
+# Core Telegram Bot Dependencies
 pyrofork==2.3.45
-tgcrypto
-motor
-Flask==1.1.2
-gunicorn==20.1.0
-Jinja2==3.0.3
-werkzeug==2.0.2
-itsdangerous==2.0.1
+tgcrypto==1.2.5
+
+# Database
+motor==3.3.2
+pymongo==4.6.1
+
+# Web Server
+Flask==2.3.3
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Security and Compatibility
+Jinja2==3.1.2
+werkzeug==2.3.7
+itsdangerous==2.1.2
+MarkupSafe==2.1.3
+
+# Additional utilities for better stability
+aiofiles==23.2.1
+requests==2.31.0
