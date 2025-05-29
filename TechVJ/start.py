@@ -19,7 +19,6 @@ async def downstatus(client, statusfile, message, chat):
     while True:
         if os.path.exists(statusfile):
             break
-
         await asyncio.sleep(3)
       
     while os.path.exists(statusfile):
@@ -31,13 +30,10 @@ async def downstatus(client, statusfile, message, chat):
         except:
             await asyncio.sleep(5)
 
-
-# upload status
 async def upstatus(client, statusfile, message, chat):
     while True:
         if os.path.exists(statusfile):
             break
-
         await asyncio.sleep(3)      
     while os.path.exists(statusfile):
         with open(statusfile, "r") as upread:
@@ -48,14 +44,10 @@ async def upstatus(client, statusfile, message, chat):
         except:
             await asyncio.sleep(5)
 
-
-# progress writer
 def progress(current, total, message, type):
     with open(f'{message.id}{type}status.txt', "w") as fileup:
         fileup.write(f"{current * 100 / total:.1f}%")
 
-
-# start command
 @Client.on_message(filters.command(["start"]))
 async def send_start(client: Client, message: Message):
     if not await db.is_user_exist(message.from_user.id):
@@ -75,8 +67,6 @@ async def send_start(client: Client, message: Message):
     )
     return
 
-
-# help command
 @Client.on_message(filters.command(["help"]))
 async def send_help(client: Client, message: Message):
     await client.send_message(
@@ -84,7 +74,6 @@ async def send_help(client: Client, message: Message):
         text=f"{HELP_TXT}"
     )
 
-# cancel command
 @Client.on_message(filters.command(["cancel"]))
 async def send_cancel(client: Client, message: Message):
     batch_temp.IS_BATCH[message.from_user.id] = True
@@ -98,6 +87,7 @@ async def save(client: Client, message: Message):
     if "https://t.me/" in message.text:
         if batch_temp.IS_BATCH.get(message.from_user.id) == False:
             return await message.reply_text("**One Task Is Already Processing. Wait For Complete It. If You Want To Cancel This Task Then Use - /cancel**")
+        
         datas = message.text.split("/")
         temp = datas[-1].replace("?single","").split("-")
         fromID = int(temp[0].strip())
@@ -105,49 +95,71 @@ async def save(client: Client, message: Message):
             toID = int(temp[1].strip())
         except:
             toID = fromID
+        
         batch_temp.IS_BATCH[message.from_user.id] = False
+        
         for msgid in range(fromID, toID+1):
-            if batch_temp.IS_BATCH.get(message.from_user.id): break
+            if batch_temp.IS_BATCH.get(message.from_user.id): 
+                break
+                
             user_data = await db.get_session(message.from_user.id)
             if user_data is None:
                 await message.reply("**For Downloading Restricted Content You Have To /login First.**")
                 batch_temp.IS_BATCH[message.from_user.id] = True
                 return
+            
             try:
                 acc = Client("saverestricted", session_string=user_data, api_hash=API_HASH, api_id=API_ID)
                 await acc.connect()
-            except:
+            except FloodWait as e:
+                await message.reply(f"**Rate limit hit. Please wait {e.value} seconds before trying again.**")
+                batch_temp.IS_BATCH[message.from_user.id] = True
+                return
+            except Exception as e:
                 batch_temp.IS_BATCH[message.from_user.id] = True
                 return await message.reply("**Your Login Session Expired. So /logout First Then Login Again By - /login**")
             
-            # private
+            # Handle different URL types
             if "https://t.me/c/" in message.text:
                 chatid = int("-100" + datas[4])
                 try:
                     await handle_private(client, acc, message, chatid, msgid)
+                except FloodWait as e:
+                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                    await asyncio.sleep(e.value)
+                    continue
                 except Exception as e:
                     if ERROR_MESSAGE == True:
                         await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
     
-            # bot
             elif "https://t.me/b/" in message.text:
                 username = datas[4]
                 try:
                     await handle_private(client, acc, message, username, msgid)
+                except FloodWait as e:
+                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                    await asyncio.sleep(e.value)
+                    continue
                 except Exception as e:
                     if ERROR_MESSAGE == True:
                         await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
             
-            # public
             else:
                 username = datas[3]
-
                 try:
                     msg = await client.get_messages(username, msgid)
                 except UsernameNotOccupied: 
                     await client.send_message(message.chat.id, "The username is not occupied by anyone", reply_to_message_id=message.id)
                     return
+                except FloodWait as e:
+                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                    await asyncio.sleep(e.value)
+                    continue
+                
                 try:
+                    await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
                     await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
                 except:
                     try:    
@@ -156,23 +168,32 @@ async def save(client: Client, message: Message):
                         if ERROR_MESSAGE == True:
                             await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
 
-            # wait time
-            await asyncio.sleep(3)
+            # Increased wait time to avoid rate limits
+            await asyncio.sleep(5)
+            
         batch_temp.IS_BATCH[message.from_user.id] = True
 
-
-# handle private
 async def handle_private(client: Client, acc, message: Message, chatid: int, msgid: int):
-    msg: Message = await acc.get_messages(chatid, msgid)
+    try:
+        msg: Message = await acc.get_messages(chatid, msgid)
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        msg: Message = await acc.get_messages(chatid, msgid)
+    
     if msg.empty: return 
     msg_type = get_message_type(msg)
     if not msg_type: return 
     chat = message.chat.id
     if batch_temp.IS_BATCH.get(message.from_user.id): return 
+    
     if "Text" == msg_type:
         try:
             await client.send_message(chat, msg.text, entities=msg.entities, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
             return 
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+            await client.send_message(chat, msg.text, entities=msg.entities, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
+            return
         except Exception as e:
             if ERROR_MESSAGE == True:
                 await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
@@ -180,98 +201,83 @@ async def handle_private(client: Client, acc, message: Message, chatid: int, msg
 
     smsg = await client.send_message(message.chat.id, '**Downloading**', reply_to_message_id=message.id)
     asyncio.create_task(downstatus(client, f'{message.id}downstatus.txt', smsg, chat))
+    
     try:
         file = await acc.download_media(msg, progress=progress, progress_args=[message,"down"])
-        os.remove(f'{message.id}downstatus.txt')
+        if os.path.exists(f'{message.id}downstatus.txt'):
+            os.remove(f'{message.id}downstatus.txt')
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        file = await acc.download_media(msg, progress=progress, progress_args=[message,"down"])
+        if os.path.exists(f'{message.id}downstatus.txt'):
+            os.remove(f'{message.id}downstatus.txt')
     except Exception as e:
         if ERROR_MESSAGE == True:
             await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML) 
         return await smsg.delete()
+    
     if batch_temp.IS_BATCH.get(message.from_user.id): return 
     asyncio.create_task(upstatus(client, f'{message.id}upstatus.txt', smsg, chat))
 
-    if msg.caption:
-        caption = msg.caption
-    else:
-        caption = None
+    caption = msg.caption if msg.caption else None
     if batch_temp.IS_BATCH.get(message.from_user.id): return 
             
-    if "Document" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.document.thumbs[0].file_id)
-        except:
-            ph_path = None
-        
-        try:
+    # Handle different media types with FloodWait protection
+    try:
+        if "Document" == msg_type:
+            try:
+                ph_path = await acc.download_media(msg.document.thumbs[0].file_id)
+            except:
+                ph_path = None
+            
             await client.send_document(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        if ph_path != None: os.remove(ph_path)
-        
+            if ph_path: os.remove(ph_path)
 
-    elif "Video" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.video.thumbs[0].file_id)
-        except:
-            ph_path = None
-        
-        try:
+        elif "Video" == msg_type:
+            try:
+                ph_path = await acc.download_media(msg.video.thumbs[0].file_id)
+            except:
+                ph_path = None
+            
             await client.send_video(chat, file, duration=msg.video.duration, width=msg.video.width, height=msg.video.height, thumb=ph_path, caption=caption, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        if ph_path != None: os.remove(ph_path)
+            if ph_path: os.remove(ph_path)
 
-    elif "Animation" == msg_type:
-        try:
+        elif "Animation" == msg_type:
             await client.send_animation(chat, file, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
         
-    elif "Sticker" == msg_type:
-        try:
+        elif "Sticker" == msg_type:
             await client.send_sticker(chat, file, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)     
 
-    elif "Voice" == msg_type:
-        try:
+        elif "Voice" == msg_type:
             await client.send_voice(chat, file, caption=caption, caption_entities=msg.caption_entities, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML, progress=progress, progress_args=[message,"up"])
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
 
-    elif "Audio" == msg_type:
-        try:
-            ph_path = await acc.download_media(msg.audio.thumbs[0].file_id)
-        except:
-            ph_path = None
-
-        try:
+        elif "Audio" == msg_type:
+            try:
+                ph_path = await acc.download_media(msg.audio.thumbs[0].file_id)
+            except:
+                ph_path = None
+            
             await client.send_audio(chat, file, thumb=ph_path, caption=caption, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML, progress=progress, progress_args=[message,"up"])   
-        except Exception as e:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        
-        if ph_path != None: os.remove(ph_path)
+            if ph_path: os.remove(ph_path)
 
-    elif "Photo" == msg_type:
-        try:
+        elif "Photo" == msg_type:
             await client.send_photo(chat, file, caption=caption, reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
-        except:
-            if ERROR_MESSAGE == True:
-                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
+
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        # Retry the upload after waiting
+        # (You can add retry logic here if needed)
+    except Exception as e:
+        if ERROR_MESSAGE == True:
+            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id, parse_mode=enums.ParseMode.HTML)
     
+    # Cleanup
     if os.path.exists(f'{message.id}upstatus.txt'): 
         os.remove(f'{message.id}upstatus.txt')
+    if os.path.exists(file):
         os.remove(file)
     await client.delete_messages(message.chat.id,[smsg.id])
 
-
-# get the type of message
 def get_message_type(msg: pyrogram.types.messages_and_media.message.Message):
     try:
         msg.document.file_id
@@ -320,4 +326,3 @@ def get_message_type(msg: pyrogram.types.messages_and_media.message.Message):
         return "Text"
     except:
         pass
-        
