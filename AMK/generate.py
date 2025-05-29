@@ -1,6 +1,5 @@
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Don't Remove Credit Tg - @mr_readers
+# Ask Doubt on telegram @mr_readers
 
 import traceback
 import tempfile
@@ -135,6 +134,5 @@ def cleanup_session_files(session_path):
     except:
         pass
 
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Don't Remove Credit Tg - @mr_readers
+# Ask Doubt on telegram @mr_readers
