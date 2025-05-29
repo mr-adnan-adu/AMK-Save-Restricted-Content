@@ -1,6 +1,6 @@
-# Don't Remove Credit Tg - @VJ_Botz
+# Don't Remove Credit Tg - @mr_readers
 # Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Ask Doubt on telegram @mr_readers
 
 import asyncio
 import os
@@ -13,7 +13,7 @@ class Bot(Client):
 
     def __init__(self):
         # Use a unique session name with temp directory to avoid conflicts
-        session_name = f"techvj_login_{os.getpid()}"
+        session_name = f"amk_login_{os.getpid()}"
         session_path = os.path.join(tempfile.gettempdir(), session_name)
         
         super().__init__(
@@ -21,7 +21,7 @@ class Bot(Client):
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
-            plugins=dict(root="TechVJ"),
+            plugins=dict(root="AMK"),
             workers=50,
             sleep_threshold=10
         )
@@ -33,7 +33,7 @@ class Bot(Client):
         for attempt in range(max_retries):
             try:
                 await super().start()
-                print('Bot Started Powered By @VJ_Botz')
+                print('Bot Started Powered By @mr_readers')
                 return
             except FloodWait as e:
                 print(f"FloodWait error: Sleeping for {e.value} seconds")
@@ -83,6 +83,5 @@ class Bot(Client):
 if __name__ == "__main__":
     Bot().run()
 
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Don't Remove Credit Tg - @mr_readers
+# Ask Doubt on telegram @mr_readers
