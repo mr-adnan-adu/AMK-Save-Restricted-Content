@@ -4,6 +4,7 @@
 
 import os
 import asyncio 
+import tempfile
 import pyrogram
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait, UserIsBlocked, InputUserDeactivated, UserAlreadyParticipant, InviteHashExpired, UsernameNotOccupied
@@ -108,70 +109,112 @@ async def save(client: Client, message: Message):
                 batch_temp.IS_BATCH[message.from_user.id] = True
                 return
             
+            acc = None
             try:
-                acc = Client("saverestricted", session_string=user_data, api_hash=API_HASH, api_id=API_ID)
+                # Use unique session name for user client
+                session_name = f"user_{message.from_user.id}_{os.getpid()}"
+                session_path = os.path.join(tempfile.gettempdir(), session_name)
+                
+                acc = Client(session_path, session_string=user_data, api_hash=API_HASH, api_id=API_ID)
                 await acc.connect()
+                
             except FloodWait as e:
                 await message.reply(f"**Rate limit hit. Please wait {e.value} seconds before trying again.**")
                 batch_temp.IS_BATCH[message.from_user.id] = True
                 return
             except Exception as e:
                 batch_temp.IS_BATCH[message.from_user.id] = True
+                if acc:
+                    try:
+                        await acc.disconnect()
+                    except:
+                        pass
                 return await message.reply("**Your Login Session Expired. So /logout First Then Login Again By - /login**")
             
-            # Handle different URL types
-            if "https://t.me/c/" in message.text:
-                chatid = int("-100" + datas[4])
-                try:
-                    await handle_private(client, acc, message, chatid, msgid)
-                except FloodWait as e:
-                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
-                    await asyncio.sleep(e.value)
-                    continue
-                except Exception as e:
-                    if ERROR_MESSAGE == True:
-                        await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-    
-            elif "https://t.me/b/" in message.text:
-                username = datas[4]
-                try:
-                    await handle_private(client, acc, message, username, msgid)
-                except FloodWait as e:
-                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
-                    await asyncio.sleep(e.value)
-                    continue
-                except Exception as e:
-                    if ERROR_MESSAGE == True:
-                        await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
-            
-            else:
-                username = datas[3]
-                try:
-                    msg = await client.get_messages(username, msgid)
-                except UsernameNotOccupied: 
-                    await client.send_message(message.chat.id, "The username is not occupied by anyone", reply_to_message_id=message.id)
-                    return
-                except FloodWait as e:
-                    await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
-                    await asyncio.sleep(e.value)
-                    continue
-                
-                try:
-                    await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
-                    await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
-                except:
-                    try:    
-                        await handle_private(client, acc, message, username, msgid)               
+            try:
+                # Handle different URL types
+                if "https://t.me/c/" in message.text:
+                    chatid = int("-100" + datas[4])
+                    try:
+                        await handle_private(client, acc, message, chatid, msgid)
+                    except FloodWait as e:
+                        await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                        await asyncio.sleep(e.value)
+                        continue
                     except Exception as e:
                         if ERROR_MESSAGE == True:
                             await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+        
+                elif "https://t.me/b/" in message.text:
+                    username = datas[4]
+                    try:
+                        await handle_private(client, acc, message, username, msgid)
+                    except FloodWait as e:
+                        await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                        await asyncio.sleep(e.value)
+                        continue
+                    except Exception as e:
+                        if ERROR_MESSAGE == True:
+                            await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
+                
+                else:
+                    username = datas[3]
+                    try:
+                        msg = await client.get_messages(username, msgid)
+                    except UsernameNotOccupied: 
+                        await client.send_message(message.chat.id, "The username is not occupied by anyone", reply_to_message_id=message.id)
+                        break
+                    except FloodWait as e:
+                        await message.reply(f"**Rate limit hit. Waiting {e.value} seconds...**")
+                        await asyncio.sleep(e.value)
+                        continue
+                    
+                    try:
+                        await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)
+                        await client.copy_message(message.chat.id, msg.chat.id, msg.id, reply_to_message_id=message.id)
+                    except:
+                        try:    
+                            await handle_private(client, acc, message, username, msgid)               
+                        except Exception as e:
+                            if ERROR_MESSAGE == True:
+                                await client.send_message(message.chat.id, f"Error: {e}", reply_to_message_id=message.id)
 
-            # Increased wait time to avoid rate limits
-            await asyncio.sleep(5)
+                # Increased wait time to avoid rate limits
+                await asyncio.sleep(5)
+                
+            finally:
+                # Always disconnect and cleanup
+                if acc:
+                    try:
+                        await acc.disconnect()
+                    except:
+                        pass
+                    
+                    # Cleanup session files
+                    cleanup_user_session_files(session_path)
             
         batch_temp.IS_BATCH[message.from_user.id] = True
+
+def cleanup_user_session_files(session_path):
+    """Clean up user session files"""
+    try:
+        session_files = [
+            f"{session_path}.session",
+            f"{session_path}.session-journal", 
+            f"{session_path}.session-wal",
+            f"{session_path}.session-shm"
+        ]
+        
+        for file_path in session_files:
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+    except:
+        pass
 
 async def handle_private(client: Client, acc, message: Message, chatid: int, msgid: int):
     try:
