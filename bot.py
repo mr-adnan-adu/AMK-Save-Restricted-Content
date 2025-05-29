@@ -3,6 +3,8 @@
 # Ask Doubt on telegram @KingVJ01
 
 import asyncio
+import os
+import tempfile
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 from config import API_ID, API_HASH, BOT_TOKEN
@@ -10,8 +12,12 @@ from config import API_ID, API_HASH, BOT_TOKEN
 class Bot(Client):
 
     def __init__(self):
+        # Use a unique session name with temp directory to avoid conflicts
+        session_name = f"techvj_login_{os.getpid()}"
+        session_path = os.path.join(tempfile.gettempdir(), session_name)
+        
         super().__init__(
-            "techvj login",
+            session_path,
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
@@ -21,22 +27,58 @@ class Bot(Client):
         )
 
     async def start(self):
+        max_retries = 5
+        retry_delay = 10
+        
+        for attempt in range(max_retries):
+            try:
+                await super().start()
+                print('Bot Started Powered By @VJ_Botz')
+                return
+            except FloodWait as e:
+                print(f"FloodWait error: Sleeping for {e.value} seconds")
+                await asyncio.sleep(e.value)
+            except Exception as e:
+                print(f"Error starting bot (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                # Clean up potential lock files
+                await self.cleanup_session_files()
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+                else:
+                    print("Max retries reached. Bot startup failed.")
+                    raise
+
+    async def cleanup_session_files(self):
+        """Clean up session files that might be causing locks"""
         try:
-            await super().start()
-            print('Bot Started Powered By @VJ_Botz')
-        except FloodWait as e:
-            print(f"FloodWait error: Sleeping for {e.value} seconds")
-            await asyncio.sleep(e.value)
-            await self.start()  # Retry after waiting
+            session_files = [
+                f"{self.name}.session",
+                f"{self.name}.session-journal",
+                f"{self.name}.session-wal",
+                f"{self.name}.session-shm"
+            ]
+            
+            for file_path in session_files:
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        print(f"Cleaned up session file: {file_path}")
+                    except Exception as e:
+                        print(f"Could not remove {file_path}: {e}")
         except Exception as e:
-            print(f"Error starting bot: {e}")
-            # Wait 60 seconds before retrying to avoid rapid restarts
-            await asyncio.sleep(60)
-            await self.start()
+            print(f"Error during session cleanup: {e}")
 
     async def stop(self, *args):
-        await super().stop()
-        print('Bot Stopped Bye')
+        try:
+            await super().stop()
+            print('Bot Stopped Bye')
+        except Exception as e:
+            print(f"Error stopping bot: {e}")
+        finally:
+            # Clean up session files on stop
+            await self.cleanup_session_files()
 
 if __name__ == "__main__":
     Bot().run()
