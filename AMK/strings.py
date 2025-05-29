@@ -1,6 +1,5 @@
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Don't Remove Credit Tg - @mr_readers
+# Ask Doubt on telegram @mr_readers
 
 HELP_TXT = """**🌟 Help Menu** 
 
@@ -31,6 +30,5 @@ https://t.me/c/xxxx/101 - 120
 
 __note that space in between doesn't matter__"""
        
-# Don't Remove Credit Tg - @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Don't Remove Credit Tg - @mr_readers
+# Ask Doubt on telegram @mr_readers
